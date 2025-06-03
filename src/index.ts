@@ -1,39 +1,201 @@
-import express from "express"
-import jwt from "jsonwebtoken"
+    import express from "express";
+    import jwt from "jsonwebtoken";
+    import z from "zod";
+    import bcrypt from "bcrypt";
+    import { UserModel,ContentModel } from "./db";
+    import { connectDB } from "./db";
+    import {protect} from "./middleware"
+    import dotenv from "dotenv";
+    dotenv.config();
 
+    const app = express();
+    app.use(express.json());
+    connectDB();
 
-const app=express();
+    const PORT = 3000;
 
-const PORT=3000
+    app.post("/api/v1/signup", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const schema = z.object({
+        username: z
+            .string()
+            .min(3, { message: "Username must be at least 3 characters long" })
+            .max(20, { message: "Username must be at most 20 characters long" })
+            .regex(/^[a-zA-Z0-9_]+$/, {
+            message:
+                "Username can only contain letters, numbers, and underscores",
+            }),
 
-app.post('/api/v1/signup',(req,res)=>{
+        password: z
+            .string()
+            .min(8, { message: "Password must be at least 8 characters long" })
+            .max(100)
+            .regex(/[a-z]/, {
+            message: "Password must contain at least one lowercase letter",
+            })
+            .regex(/[A-Z]/, {
+            message: "Password must contain at least one uppercase letter",
+            })
+            .regex(/[0-9]/, {
+            message: "Password must contain at least one number",
+            })
+            .regex(/[^a-zA-Z0-9]/, {
+            message: "Password must contain at least one special character",
+            }),
+        });
 
-})
+        const result = schema.safeParse({
+        username,
+        password,
+        });
 
-app.post ("/api/v1/signin",(req,res)=>{
+        if (!result.success) {
+        res.status(401).json({
+            message: result.error.issues,
+        });
+        return;
+        }
+        const user = await UserModel.findOne({ username });
+        if (user) {
+        res.status(411).json({
+            message: "username already exists",
+        });
+        return;
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await UserModel.create({
+        username,
+        password: hashedPassword,
+        });
+        res.status(200).json({
+        message: "User signed up",
+        });
+        return;
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+        message: "Something went wrong",
+        });
+        return;
+    }
+    });
 
-})
+    app.post("/api/v1/signin", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await UserModel.findOne({ username });
+        if (!user) {
+        res.status(404).json({
+            message: "User does not exist. Please sign up",
+        });
+        return;
+        }
+        const isPasswordValid = await bcrypt.compare(
+        password,
+        user.password as string
+        );
+        if (!isPasswordValid) {
+        res.status(401).json({ message: "Invalid username or password" });
+        return;
+        }
 
-app.post('/api/v1/content',(req,res)=>{
+        const payload = {
+        id: user._id,
+        };
 
-})
+        const token = jwt.sign(payload, process.env.JWT_SECRET as string, {
+        expiresIn: "24h",
+        });
 
-app.get("/api/v1/content",(req,res)=>{
+        res.status(200).json({
+        message: "Signin successful",
+        token,
+        });
+    } catch (error) {
+        res.status(500).json({
+        message: "Something went wrong",
+        });
+        return;
+    }
+    });
 
-})
+    app.post("/api/v1/content", protect,async(req, res) => {
+        //@ts-ignore
+        const userId=req.userId;
+        try{
+            const {link,title}=req.body;
+            await ContentModel.create({
+                link,
+                title,
+                userId,
+                tags:[]
+            })
+            res.status(200).json({
+                success:true,
+                message:"content created successfully"
+            })
+        }catch(error){
+            res.status(500).json({
+                message:"Something went wrong"
+            })
+        }
+    });
 
-app.delete("/api/v1/content",(req,res)=>{
+    app.get("/api/v1/content", protect,async(req, res) => {
+        try{
+            //@ts-ignore
+            const userId=req.userId;
+            const contents=await ContentModel.find({userId:userId}).populate("userId")
+            if(contents.length===0){
+                res.status(400).json({
+                    message:"No content found"
+                })
+                return;
+            }
+            res.status(200).json({
+                message:"content feteched successfully",
+                data:contents
+            })
+            return;
+        }catch(error){
+            res.status(500).json({
+                message:"something went wrong"
+            })
+        }
+    });
 
-})
+    app.delete("/api/v1/content",protect, async(req, res) => {
+        try{
+            //@ts-ignore
+            const userId=req.userId;    
+            const contentId=req.body;
+            if(!contentId){
+                res.status(400).json({
+                    message:"Content Id is required"
+                })
+                return;
+            }
+            await ContentModel.deleteMany({
+                contentId,
+                userId:userId
+            })
+            res.status(200).json({
+                message:"content deleted successfully"
+            })
 
-app.post('/api/v1/brain/share',(req,res)=>{
+        }catch(error){
+            res.status(500).json({
+                message:"Soething went wrong"
+            })
+        }
+        
+    });
 
-})
+    app.post("/api/v1/brain/share", (req, res) => {});
 
-app.get('/api/v1/brain/"shareLink',(req,res)=>{
-    
-})
+    app.get("/api/v1/brain/shareLink", (req, res) => {});
 
-app.listen(PORT,()=>{
-    console.log("Server running on port "+PORT)
-})
+    app.listen(PORT, () => {
+    console.log("Server running on port " + PORT);
+    });
