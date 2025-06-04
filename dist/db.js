@@ -51,6 +51,7 @@ const userSchema = new mongoose_1.Schema({
 const ContentSchema = new mongoose_1.Schema({
     title: String,
     link: String,
+    type: String,
     tags: [{
             type: mongoose_1.default.Types.ObjectId,
             ref: 'Tag'
@@ -68,7 +69,9 @@ const LinkSchema = new mongoose_1.Schema({
     hash: String,
     userId: {
         type: mongoose_1.default.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        required: true,
+        unique: true
     }
 });
 exports.UserModel = (0, mongoose_1.model)("User", userSchema);

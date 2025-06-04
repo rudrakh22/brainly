@@ -17,6 +17,7 @@ const userSchema=new Schema({
 const ContentSchema=new Schema({
     title:String,
     link:String,
+    type:String,
     tags:[{
         type:mongoose.Types.ObjectId,
         ref:'Tag'
@@ -36,7 +37,9 @@ const LinkSchema=new Schema({
     hash:String,
     userId:{
         type:mongoose.Types.ObjectId,
-        ref:'User'
+        ref:'User',
+        required:true,
+        unique:true
     }
 })
 

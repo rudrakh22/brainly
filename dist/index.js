@@ -10,6 +10,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const db_1 = require("./db");
 const db_2 = require("./db");
 const middleware_1 = require("./middleware");
+const utils_1 = require("./utils");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -116,10 +117,16 @@ app.post("/api/v1/content", middleware_1.protect, async (req, res) => {
     //@ts-ignore
     const userId = req.userId;
     try {
-        const { link, title } = req.body;
+        const { link, title, type } = req.body;
+        if (!link || !title || !type) {
+            res.status(400).json({
+                message: "Please fill required fields"
+            });
+        }
         await db_1.ContentModel.create({
             link,
             title,
+            type,
             userId,
             tags: []
         });
@@ -139,7 +146,6 @@ app.get("/api/v1/content", middleware_1.protect, async (req, res) => {
         //@ts-ignore
         const userId = req.userId;
         const contents = await db_1.ContentModel.find({ userId: userId }).populate("userId");
-        console.log("contents", contents);
         if (contents.length === 0) {
             res.status(400).json({
                 message: "No content found"
@@ -158,9 +164,96 @@ app.get("/api/v1/content", middleware_1.protect, async (req, res) => {
         });
     }
 });
-app.delete("/api/v1/content", (req, res) => { });
-app.post("/api/v1/brain/share", (req, res) => { });
-app.get("/api/v1/brain/shareLink", (req, res) => { });
+app.delete("/api/v1/content", middleware_1.protect, async (req, res) => {
+    try {
+        //@ts-ignore
+        const userId = req.userId;
+        const contentId = req.body;
+        if (!contentId) {
+            res.status(400).json({
+                message: "Content Id is required"
+            });
+            return;
+        }
+        await db_1.ContentModel.deleteMany({
+            contentId,
+            userId: userId
+        });
+        res.status(200).json({
+            message: "content deleted successfully"
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            message: "Soething went wrong"
+        });
+    }
+});
+app.post("/api/v1/brain/share", middleware_1.protect, async (req, res) => {
+    try {
+        const { share } = req.body;
+        let hash = (0, utils_1.random)(10);
+        if (share) {
+            const existingLink = await db_1.LinkModel.findOne({
+                //@ts-ignore
+                userId: req.userId
+            });
+            if (existingLink) {
+                res.status(200).json({
+                    message: "Your previous link",
+                    hash: existingLink.hash
+                });
+                return;
+            }
+            await db_1.LinkModel.create({
+                //  @ts-ignore
+                userId: req.userId,
+                hash: hash
+            });
+            res.status(200).json({
+                message: "Link created",
+                hash: hash
+            });
+        }
+        else {
+            await db_1.LinkModel.deleteOne({
+                //  @ts-ignore
+                userId: req.userId
+            });
+            res.status(200).json({
+                message: "Removed Link"
+            });
+        }
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "something went wrong"
+        });
+    }
+});
+app.get("/api/v1/brain/:shareLink", async (req, res) => {
+    //  @ts-ignore
+    const hash = req.params.shareLink;
+    const link = await db_1.LinkModel.findOne({
+        hash
+    });
+    if (!link) {
+        res.status(400).json({
+            message: "Link not found"
+        });
+        return;
+    }
+    const content = await db_1.ContentModel.find({
+        userId: link.userId
+    });
+    const user = await db_1.UserModel.findById(link.userId);
+    res.status(200).json({
+        success: true,
+        username: user?._id,
+        content: content
+    });
+});
 app.listen(PORT, () => {
     console.log("Server running on port " + PORT);
 });
