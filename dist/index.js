@@ -12,8 +12,10 @@ const db_2 = require("./db");
 const middleware_1 = require("./middleware");
 const utils_1 = require("./utils");
 const dotenv_1 = __importDefault(require("dotenv"));
+const cors_1 = __importDefault(require("cors"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
+app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 (0, db_2.connectDB)();
 const PORT = 3000;
@@ -166,9 +168,11 @@ app.get("/api/v1/content", middleware_1.protect, async (req, res) => {
 });
 app.delete("/api/v1/content", middleware_1.protect, async (req, res) => {
     try {
-        //@ts-ignore
+        // @ts-ignore
         const userId = req.userId;
-        const contentId = req.body;
+        const { contentId } = req.body;
+        console.log("userId:", userId);
+        console.log("contentId:", contentId);
         if (!contentId) {
             res.status(400).json({
                 message: "Content Id is required"
@@ -176,16 +180,16 @@ app.delete("/api/v1/content", middleware_1.protect, async (req, res) => {
             return;
         }
         await db_1.ContentModel.deleteMany({
-            contentId,
+            _id: contentId,
             userId: userId
         });
         res.status(200).json({
-            message: "content deleted successfully"
+            message: "Content deleted successfully"
         });
     }
     catch (error) {
         res.status(500).json({
-            message: "Soething went wrong"
+            message: "Something went wrong"
         });
     }
 });

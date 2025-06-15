@@ -7,9 +7,11 @@
     import {protect} from "./middleware"
     import { random } from "./utils";
     import dotenv from "dotenv";
+    import cors from "cors"
     dotenv.config();
 
     const app = express();
+    app.use(cors())
     app.use(express.json());
     connectDB();
 
@@ -172,32 +174,38 @@
         }
     });
 
-    app.delete("/api/v1/content",protect, async(req, res) => {
-        try{
-            //@ts-ignore
-            const userId=req.userId;    
-            const contentId=req.body;
-            if(!contentId){
-                res.status(400).json({
-                    message:"Content Id is required"
-                })
-                return;
-            }
-            await ContentModel.deleteMany({
-                contentId,
-                userId:userId
-            })
-            res.status(200).json({
-                message:"content deleted successfully"
-            })
+app.delete("/api/v1/content", protect, async (req, res) => {
+    try {
 
-        }catch(error){
-            res.status(500).json({
-                message:"Soething went wrong"
-            })
+        // @ts-ignore
+        const userId = req.userId;    
+        const { contentId } = req.body;
+
+        console.log("userId:", userId);
+console.log("contentId:", contentId);
+        if (!contentId) {
+            res.status(400).json({
+                message: "Content Id is required"
+            });
+            return;
         }
-        
-    });
+
+        await ContentModel.deleteMany({
+            _id:contentId,
+            userId: userId
+        });
+
+        res.status(200).json({
+            message: "Content deleted successfully"
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            message: "Something went wrong"
+        });
+    }
+});
+
 
     app.post("/api/v1/brain/share",protect, async(req, res) => {
         try{
